@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"time"
 
 	"github.com/francoganga/statement_to_csv/internal/parser"
 )
@@ -24,6 +25,23 @@ func main() {
 
 	filenames := os.Args[1:]
 
+	file, err := os.Create("out.csv")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	defer file.Close()
+
+	writer := csv.NewWriter(file)
+
+	defer writer.Flush()
+
+	header := []string{"Date", "Code", "Description", "Amount", "Balance"}
+
+	csvData := [][]string{}
+
+	writer.Write(header)
+
 	for _, filename := range filenames {
 		//open and read file
 		fileContent, err := os.ReadFile(filename)
@@ -31,16 +49,12 @@ func main() {
 			log.Fatal(err)
 		}
 
-		fmt.Printf("fileContent=%v\n", string(fileContent))
-
 		matches, err := GetMatchesFromFile(fileContent)
 		if err != nil {
 			log.Fatal(err)
 		}
 
 		fmt.Printf("len(matches)=%v\n", len(matches))
-
-		csvData := [][]string{{"Date", "Code", "Description", "Amount", "Balance"}}
 
 		for _, match := range matches {
 
@@ -51,19 +65,14 @@ func main() {
 
 			fmt.Println(consumo)
 
-			csvData = append(csvData, []string{consumo.Date, consumo.Code, consumo.Description, fmt.Sprintf("%d", consumo.Amount), fmt.Sprintf("%d", consumo.Balance)})
+			t, err := time.Parse("02/01/06", consumo.Date)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			csvData = append(csvData, []string{t.Format("2006-01-02"), consumo.Code, consumo.Description, fmt.Sprintf("%d", consumo.Amount/100), fmt.Sprintf("%d", consumo.Balance/100)})
 		}
-
-		file, err := os.Create(fmt.Sprintf("%s.csv", filename))
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		defer file.Close()
-
-		writer := csv.NewWriter(file)
-
-		defer writer.Flush()
+		fmt.Printf("csvData=%v\n", csvData)
 
 		for _, row := range csvData {
 			if err := writer.Write(row); err != nil {
@@ -71,9 +80,6 @@ func main() {
 			}
 
 		}
-
-		fmt.Printf("Data has been written to %s", fmt.Sprintf("%s.csv", filename))
-
 	}
 }
 
